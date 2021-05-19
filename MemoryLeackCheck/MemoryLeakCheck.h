@@ -1,13 +1,31 @@
 #pragma once
 
-struct MemInfo {
 
-	void* ptr;
-	char* fileName;
-	int line;
-
-};
 namespace __MLC {
+
+
+#pragma region  struct
+
+	struct MemInfo {
+
+		void* ptr;
+		char* fileName;
+		int line;
+
+	};
+
+	using valueType = MemInfo;
+	using ptrType = MemInfo*;
+
+	struct Node {
+
+		ptrType value;
+		Node* parent;
+		Node* child;
+		int idx;
+
+	};
+#pragma endregion
 
 	class Stack {
 
@@ -47,7 +65,7 @@ namespace __MLC {
 
 			memcpy_s(arr, nextCap, prevArr, cap);
 
-			delete(prevArr);
+			free(prevArr);
 
 		}
 #pragma endregion
@@ -66,31 +84,14 @@ namespace __MLC {
 
 	public:
 
-		using valueType = MemInfo*;
-
-#pragma region public struct
-	public:
-
-		struct Node {
-
-			valueType value;
-			Node* parent;
-			Node* child;
-			int idx;
-
-		};
-#pragma endregion
-
-	public:
-
 		Node* first;
 
 		List(int cap = 1) {
 			this->cap = cap;
-			allocArr(arr, cap);
+			allocArr(cap);
 		}
 
-		void insert(valueType value, Node* parent = nullptr) {
+		void insert(ptrType value, Node* parent = nullptr) {
 
 			if (notUsedIdx.getSize() == 0) {
 				resize(cap * 2);
@@ -100,13 +101,16 @@ namespace __MLC {
 			int idx = notUsedIdx.front();
 			notUsedIdx.pop();
 
-			arr[idx]->value = (valueType)malloc(sizeof(valueType));
+			arr[idx]->value = (ptrType)malloc(sizeof(valueType));
+			memcpy_s(arr[idx]->value, sizeof(valueType), value, sizeof(valueType));
 			arr[idx]->parent = parent;
 			arr[idx]->idx = idx;
 
 			if (parent == nullptr) {
+				arr[idx]->child = first;
+				if(arr[idx]->child != nullptr)
+					arr[idx]->child->parent = arr[idx];
 				first = arr[idx];
-				arr[idx]->child = nullptr;
 				return;
 			}
 
@@ -118,42 +122,68 @@ namespace __MLC {
 		}
 
 		void erase(Node* node) {
-			free(node->value);
+			free((void*)(*(int*)(node->value->ptr)));
 			notUsedIdx.push(node->idx);
-			
+
 			Node* parent = node->parent;
 			Node* child = node->child;
+
+			if (first == node) {
+				first = child;
+			}
 
 			if (parent != nullptr) {
 				parent->child = child;
 			}
-			
+
 			if (child != nullptr) {
 				child->parent = parent;
 			}
+
+		}
+
+		Node* find(const void* ptr) {
+			volatile int k = 0;
+			if (first == nullptr) {
+				return nullptr;
+			}
+			for (Node* iter = first; iter != nullptr; iter = iter->child) {
+				if (iter->value->ptr == ptr) {
+					return iter;
+				}
+
+				if (iter->child == nullptr) {
+					break;
+				}
+			}
+			return nullptr;
 		}
 
 #pragma region private func
 
-		void allocArr(Node** arr, int cap) {
+		void allocArr(int cap) {
 
-			arr = (Node**)malloc(sizeof(Node*) * cap);
+			this->arr = (Node**)malloc(sizeof(Node*) * cap);
 
 			for (int idxCnt = 0; idxCnt < cap; idxCnt++) {
-				arr[idxCnt] = (Node*)malloc(sizeof(Node));
+				this->arr[idxCnt] = (Node*)malloc(sizeof(Node));
 				notUsedIdx.push(idxCnt);
 			}
 		}
-		
+
 		void resize(int nextCap) {
 			Node** beforeArr = arr;
 
-			allocArr(arr, nextCap);
+			allocArr(nextCap);
+
+			memcpy_s(arr, nextCap, beforeArr, cap);
+
+			free(beforeArr);
 
 		}
 
 #pragma endregion
-
+		
 #pragma region private var
 	private:
 
@@ -161,17 +191,83 @@ namespace __MLC {
 		int cap;
 		Stack notUsedIdx;
 
-	};
 #pragma endregion
+	};
 }
 
 class MemoryLeakChecker {
 
 public:
 
-	
-private:
+	MemoryLeakChecker() {
+		FILE* logFile;
+		tm* now = (tm*)malloc(sizeof(tm));
+		__time64_t longTime;
+		_time64(&longTime);
+		localtime_s(now, &longTime);
+
+		sprintf_s(fileName, "mlcLog%04d%02d%02d_%02d%02d%02d.txt", now->tm_year, now->tm_mon + 1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec);
+
+		fopen_s(&logFile, fileName, "w");
+		fclose(logFile);
+
+	}
+
+	~MemoryLeakChecker() {
+		FILE* logFile;
+		fopen_s(&logFile, fileName, "a");
+		for (__MLC::Node* iter = adr.first; iter != nullptr; iter = iter->child) {
+			printf_s("[LEAK] %d %s %d\n", iter->value->ptr, iter->value->fileName, iter->value->line);
+			fprintf_s(logFile,"[LEAK] %d %s %d\n", iter->value->ptr, iter->value->fileName, iter->value->line);
+			if (iter->child == nullptr) {
+				break;
+			}
+		}
+
+	}
 
 	__MLC::List adr;
 
+private:
+
+	char fileName[26];
+
 };
+
+MemoryLeakChecker *mlc = new MemoryLeakChecker();
+
+void* operator new(size_t size, const char* file, int line) {
+	void* ptr = malloc(size);
+
+	__MLC::MemInfo* info = (__MLC::MemInfo*)malloc(sizeof(__MLC::MemInfo));
+	int fileNameLen = strlen(file);
+	info->fileName = (char*)malloc(fileNameLen + 1);
+	memcpy_s(info->fileName, fileNameLen, file, fileNameLen);
+	info->fileName[fileNameLen] = '\0';
+
+	info->line = line;
+	info->ptr = ptr;
+
+	mlc->adr.insert(info, nullptr);
+
+	return ptr;
+}
+
+void operator delete(void* ptr, char* file, int line) {}
+
+void operator delete(void* ptr) {
+	int a = 1;
+	__MLC::Node* node;
+	node = mlc->adr.find(ptr);
+
+	if (node == nullptr) {
+		// 미할당 구간 해제 시도
+		return;
+	}
+
+	free(node->value);
+	mlc->adr.erase(node);
+}
+
+
+#define new new(__FILE__, __LINE__)
