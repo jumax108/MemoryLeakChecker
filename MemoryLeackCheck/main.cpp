@@ -8,11 +8,9 @@
 int main() {
 
 
-	int* a = new int;
+	int* a = new int[3];
 	int* b = new int;
 
-	delete a;
-	delete b;
 
 	mlc->~MemoryLeakChecker();
 	free(mlc);

@@ -218,7 +218,7 @@ public:
 		fopen_s(&logFile, fileName, "a");
 		for (__MLC::Node* iter = adr.first; iter != nullptr; iter = iter->child) {
 			printf_s("[LEAK] %d %s %d\n", iter->value->ptr, iter->value->fileName, iter->value->line);
-			fprintf_s(logFile,"[LEAK] %d %s %d\n", iter->value->ptr, iter->value->fileName, iter->value->line);
+			fprintf_s(logFile,"[LEAK] 0x%x %s %d\n", iter->value->ptr, iter->value->fileName, iter->value->line);
 			if (iter->child == nullptr) {
 				break;
 			}
@@ -227,8 +227,6 @@ public:
 	}
 
 	__MLC::List adr;
-
-private:
 
 	char fileName[26];
 
@@ -262,6 +260,12 @@ void operator delete(void* ptr) {
 
 	if (node == nullptr) {
 		// 미할당 구간 해제 시도
+
+		FILE* logFile;
+		fopen_s(&logFile, mlc->fileName, "a");
+		fprintf_s(logFile, "NOALLOC [0x%x]\n", ptr);
+		fclose(logFile);
+
 		return;
 	}
 
