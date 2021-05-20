@@ -11,6 +11,7 @@ int main() {
 	int* a = new int[3];
 	int* b = new int;
 
+	delete b;
 
 	mlc->~MemoryLeakChecker();
 	free(mlc);

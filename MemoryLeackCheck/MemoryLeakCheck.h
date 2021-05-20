@@ -142,8 +142,7 @@ namespace __MLC {
 
 		}
 
-		Node* find(const void* ptr) {
-			volatile int k = 0;
+		__declspec(noinline) Node* find(const void* ptr) {
 			if (first == nullptr) {
 				return nullptr;
 			}
@@ -254,7 +253,6 @@ void* operator new(size_t size, const char* file, int line) {
 void operator delete(void* ptr, char* file, int line) {}
 
 void operator delete(void* ptr) {
-	int a = 1;
 	__MLC::Node* node;
 	node = mlc->adr.find(ptr);
 
