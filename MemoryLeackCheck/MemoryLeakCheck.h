@@ -32,6 +32,7 @@ namespace __MLC {
 	public:
 		Stack(int cap = 1) {
 			arr = (int*)malloc(sizeof(int) * cap);
+			this->cap = cap;
 		}
 
 		void push(const int in) {
@@ -63,7 +64,7 @@ namespace __MLC {
 
 			arr = (int*)malloc(sizeof(int) * nextCap);
 
-			memcpy_s(arr, nextCap, prevArr, cap);
+			memcpy_s(arr, sizeof(int) * nextCap, prevArr, sizeof(int) * cap);
 
 			free(prevArr);
 
@@ -122,7 +123,6 @@ namespace __MLC {
 		}
 
 		void erase(Node* node) {
-			free((void*)(*(int*)(node->value->ptr)));
 			notUsedIdx.push(node->idx);
 
 			Node* parent = node->parent;
@@ -139,6 +139,7 @@ namespace __MLC {
 			if (child != nullptr) {
 				child->parent = parent;
 			}
+			free(node->value->ptr);
 
 		}
 
@@ -160,13 +161,16 @@ namespace __MLC {
 
 #pragma region private func
 
-		void allocArr(int cap) {
+		void allocArr(int nextCap) {
 
-			this->arr = (Node**)malloc(sizeof(Node*) * cap);
+			this->arr = (Node**)malloc(sizeof(Node*) * nextCap);
+			ZeroMemory(arr, sizeof(Node*) * nextCap);
 
-			for (int idxCnt = 0; idxCnt < cap; idxCnt++) {
-				this->arr[idxCnt] = (Node*)malloc(sizeof(Node));
-				notUsedIdx.push(idxCnt);
+			for (int idxCnt = 0; idxCnt < nextCap; idxCnt++){
+				if (idxCnt >= cap) {
+					this->arr[idxCnt] = (Node*)malloc(sizeof(Node));
+					notUsedIdx.push(idxCnt);
+				}
 			}
 		}
 
@@ -174,10 +178,18 @@ namespace __MLC {
 			Node** beforeArr = arr;
 
 			allocArr(nextCap);
+			/*
+			for (int idxCnt = 0; idxCnt < cap; idxCnt++) {
+				arr[idxCnt]->idx = beforeArr[idxCnt]->idx;
+				arr[idxCnt]->parent = beforeArr[idxCnt]->parent;
+				arr[idxCnt]->child = beforeArr[idxCnt]->child;
+				arr[idxCnt]->value = beforeArr[idxCnt]->value;
+			}*/
 
-			memcpy_s(arr, nextCap, beforeArr, cap);
+			memcpy_s(arr, sizeof(Node*) * nextCap, beforeArr, sizeof(Node*) * cap);
 
 			free(beforeArr);
+			///ZeroMemory(beforeArr, sizeof(Node*) * cap);
 
 		}
 
@@ -253,7 +265,7 @@ void* operator new(size_t size, const char* file, int line) {
 void operator delete(void* ptr, char* file, int line) {}
 
 void operator delete(void* ptr) {
-	__MLC::Node* node;
+	__MLC::Node* node = nullptr;
 	node = mlc->adr.find(ptr);
 
 	if (node == nullptr) {
@@ -267,8 +279,8 @@ void operator delete(void* ptr) {
 		return;
 	}
 
-	free(node->value);
 	mlc->adr.erase(node);
+	free(node->value);
 }
 
 
